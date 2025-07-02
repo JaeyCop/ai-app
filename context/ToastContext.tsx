@@ -1,45 +1,40 @@
 'use client';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import Toast from '@/components/ui/Toast';
 
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import ToastNotification from '@/components/ToastNotification';
-
-interface Toast {
-  id: string;
+type ToastMessage = {
+  id: number;
   message: string;
   type: 'success' | 'error' | 'info';
-}
+};
 
-interface ToastContextType {
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
-}
+type ToastContextType = {
+  addToast: (message: string, type: 'success' | 'error' | 'info') => void;
+};
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Date.now().toString();
-    const newToast: Toast = { id, message, type };
-    setToasts((prevToasts) => [...prevToasts, newToast]);
-
-    // Auto-remove toast after a few seconds
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts((prevToasts) => [...prevToasts, { id, message, type }]);
     setTimeout(() => {
-      setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
+      removeToast(id);
     }, 5000);
   }, []);
 
+  const removeToast = (id: number) => {
+    setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
+  };
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col space-y-2">
+      <div className="fixed top-5 right-5 z-50 space-y-2">
         {toasts.map((toast) => (
-          <ToastNotification
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToasts((prevToasts) => prevToasts.filter((t) => t.id !== toast.id))}
-          />
+          <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />
         ))}
       </div>
     </ToastContext.Provider>

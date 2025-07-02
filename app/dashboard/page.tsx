@@ -1,62 +1,37 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { HistoryEntry } from "@/app/types";
 import { FaChartLine, FaKeyboard, FaCalendarAlt, FaClock, FaFileAlt, FaTags, FaTrophy, FaRocket } from "react-icons/fa";
+import StatCard from "@/components/dashboard/StatCard";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
+import DetailedStatCard from "@/components/dashboard/DetailedStatCard";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 
 export default function DashboardPage() {
-  const [history, setHistory] = useState<any[]>([]);
-  const [totalWords, setTotalWords] = useState(0);
-  const [totalGenerations, setTotalGenerations] = useState(0);
-  const [mostUsedKeyword, setMostUsedKeyword] = useState<string | null>(null);
-  const [lastGenerated, setLastGenerated] = useState<string | null>(null);
-  const [avgWords, setAvgWords] = useState(0);
-  const [uniqueKeywords, setUniqueKeywords] = useState(0);
-  const [mostProductiveDay, setMostProductiveDay] = useState<string | null>(null);
-  const [thisWeekGenerated, setThisWeekGenerated] = useState(0);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const {
+    totalGenerations,
+    totalWords,
+    avgWords,
+    lastGeneratedDate,
+    mostUsedKeyword,
+    mostProductiveDay,
+    thisWeekGenerated,
+    uniqueKeywords,
+  } = useDashboardStats(history);
 
   useEffect(() => {
     // Simulate loading
-    setTimeout(() => {
-      const stored = JSON.parse(localStorage.getItem("generatedContentHistory") || "[]");
+    const timer = setTimeout(() => {
+      const stored: HistoryEntry[] = JSON.parse(localStorage.getItem("generatedContentHistory") || "[]");
       setHistory(stored);
-      setTotalGenerations(stored.length);
-      
-      if (stored.length > 0) {
-        setLastGenerated(new Date(stored[0].date).toLocaleString());
-        
-        // Calculate total words
-        const totalWords = stored.reduce((sum: number, entry: any) => sum + (entry.content?.split(/\s+/).length || 0), 0);
-        setTotalWords(totalWords);
-        setAvgWords(Math.round(totalWords / stored.length));
-        
-        // Find most used keyword
-        const keywordCounts: Record<string, number> = {};
-        stored.forEach((entry: any) => {
-          if (entry.keyword) keywordCounts[entry.keyword] = (keywordCounts[entry.keyword] || 0) + 1;
-        });
-        const sorted = Object.entries(keywordCounts).sort((a, b) => b[1] - a[1]);
-        setMostUsedKeyword(sorted[0]?.[0] || null);
-        setUniqueKeywords(Object.keys(keywordCounts).length);
-        
-        // Most productive day
-        const perDay: { [date: string]: number } = {};
-        stored.forEach((entry: any) => {
-          const day = new Date(entry.date).toLocaleDateString();
-          perDay[day] = (perDay[day] || 0) + 1;
-        });
-        const sortedDays = Object.entries(perDay).sort((a, b) => b[1] - a[1]);
-        setMostProductiveDay(sortedDays[0]?.[0] || null);
-        
-        // This week's generations
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        const thisWeek = stored.filter((entry: any) => new Date(entry.date) >= oneWeekAgo);
-        setThisWeekGenerated(thisWeek.length);
-      }
-      
       setIsLoading(false);
     }, 800);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const getGreeting = () => {
@@ -74,14 +49,7 @@ export default function DashboardPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-ai-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ai-green mx-auto mb-4"></div>
-          <p className="text-ai-gray">Loading your dashboard...</p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -149,7 +117,7 @@ export default function DashboardPage() {
           />
           <DetailedStatCard 
             label="Last Generated" 
-            value={lastGenerated ? new Date(lastGenerated).toLocaleDateString() : "Never"} 
+            value={lastGeneratedDate ? new Date(lastGeneratedDate).toLocaleDateString() : "Never"} 
             icon={FaClock}
             description="When you last created content"
           />
@@ -163,11 +131,11 @@ export default function DashboardPage() {
               Recent Activity
             </h2>
             <div className="space-y-3">
-              {history.slice(0, 5).map((entry, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-ai-black bg-opacity-50 rounded-lg border border-ai-border hover:border-ai-green transition-colors">
+              {history.slice(0, 5).map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between p-3 bg-ai-black bg-opacity-50 rounded-lg border border-ai-border hover:border-ai-green transition-colors">
                   <div className="flex-1">
                     <div className="font-medium text-white truncate">{entry.keyword || "Content Generated"}</div>
-                    <div className="text-sm text-ai-gray">{entry.content?.split(' ').length || 0} words</div>
+                    <div className="text-sm text-ai-gray">{entry.wordCount || 0} words</div>
                   </div>
                   <div className="text-sm text-ai-gray ml-4">
                     {new Date(entry.date).toLocaleDateString()}
@@ -185,9 +153,9 @@ export default function DashboardPage() {
               <FaRocket className="h-16 w-16 text-ai-green mx-auto mb-4" />
               <h3 className="text-xl font-bold text-white mb-2">Ready to Get Started?</h3>
               <p className="text-ai-gray mb-6">Create your first AI-generated content to see analytics here!</p>
-              <button className="bg-gradient-to-r from-ai-green to-ai-blue text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-ai-green/20 transition-all duration-200">
+              <Link href="/generate" className="bg-gradient-to-r from-ai-green to-ai-blue text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg hover:shadow-ai-green/20 transition-all duration-200">
                 Start Generating
-              </button>
+              </Link>
             </div>
           </div>
         )}
@@ -200,61 +168,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, icon: Icon, color, trend }: { 
-  label: string; 
-  value: string | number; 
-  icon: any;
-  color: string;
-  trend?: "up" | "down" | null;
-}) {
-  const getColorClasses = (color: string) => {
-    switch(color) {
-      case 'ai-green': return 'text-ai-green border-ai-green/20 bg-ai-green/5';
-      case 'ai-blue': return 'text-ai-blue border-ai-blue/20 bg-ai-blue/5';
-      case 'ai-orange': return 'text-ai-orange border-ai-orange/20 bg-ai-orange/5';
-      case 'ai-gold': return 'text-ai-gold border-ai-gold/20 bg-ai-gold/5';
-      default: return 'text-ai-green border-ai-green/20 bg-ai-green/5';
-    }
-  };
-
-  return (
-    <div className="bg-ai-surface border border-ai-border rounded-xl p-6 hover:border-ai-green/50 transition-all duration-200 group">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-lg ${getColorClasses(color)}`}>
-          <Icon className="h-6 w-6" />
-        </div>
-        {trend && (
-          <div className={`text-sm font-medium ${trend === 'up' ? 'text-ai-green' : 'text-ai-red'}`}>
-            {trend === 'up' ? '↗' : '↘'}
-          </div>
-        )}
-      </div>
-      <div className="text-3xl font-bold text-white mb-1 group-hover:text-ai-green transition-colors">
-        {value}
-      </div>
-      <div className="text-ai-gray text-sm">{label}</div>
-    </div>
-  );
-}
-
-function DetailedStatCard({ label, value, icon: Icon, description }: { 
-  label: string; 
-  value: string; 
-  icon: any;
-  description: string;
-}) {
-  return (
-    <div className="bg-ai-surface border border-ai-border rounded-xl p-6 hover:border-ai-green/50 transition-all duration-200">
-      <div className="flex items-center mb-3">
-        <Icon className="h-5 w-5 text-ai-green mr-3" />
-        <h3 className="font-semibold text-white">{label}</h3>
-      </div>
-      <div className="text-2xl font-bold text-ai-orange mb-2 truncate">{value}</div>
-      <p className="text-sm text-ai-gray">{description}</p>
     </div>
   );
 }
